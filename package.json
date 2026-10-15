@@ -1,0 +1,18 @@
+{
+  "name": "belajar-catur",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Website belajar catur interaktif, siap diperluas dengan fitur AI penjelas langkah.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "chess.js": "^1.0.0-beta.8"
+  },
+  "devDependencies": {
+    "vite": "^5.4.8"
+  }
+}

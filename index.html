@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Belajar Catur</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app__header">
+        <div class="brand">
+          <span class="brand__logo">&#9822;</span>
+          <div>
+            <h1 class="brand__title">Belajar Catur</h1>
+            <p class="brand__subtitle">Papan interaktif untuk latihan dan belajar</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="flipBtn" class="btn btn--ghost" title="Balik papan">&#8646; Balik Papan</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="board-area">
+          <div class="board-wrapper">
+            <div id="board" class="board" aria-label="Papan catur"></div>
+          </div>
+          <div class="turn-indicator">
+            <span class="turn-indicator__dot" id="turnDot"></span>
+            <span id="turnText">Giliran Putih</span>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <div class="panel__card status-card">
+            <h2 class="panel__title">Status</h2>
+            <p id="statusText" class="status-text">Mulai permainan — giliran Putih.</p>
+          </div>
+
+          <div class="panel__card">
+            <div class="panel__row">
+              <h2 class="panel__title">Riwayat Langkah</h2>
+              <span id="moveCount" class="badge">0</span>
+            </div>
+            <div id="moveList" class="move-list">
+              <p class="move-list__empty">Belum ada langkah.</p>
+            </div>
+          </div>
+
+          <div class="panel__card controls">
+            <button id="undoBtn" class="btn btn--secondary">&#8630; Undo</button>
+            <button id="resetBtn" class="btn btn--primary">&#8635; Mulai Ulang</button>
+          </div>
+
+          <div class="panel__card hint-card">
+            <h2 class="panel__title">Tips</h2>
+            <p class="hint-text">
+              Klik bidak untuk melihat langkah yang legal (ditandai titik), lalu klik
+              kotak tujuan. Fitur penjelasan langkah dengan AI akan ditambahkan nanti.
+            </p>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
