@@ -1,6 +1,7 @@
 import "./style.css";
 import { Chess } from "chess.js";
 import { pieceGlyph, pieceName } from "./pieces.js";
+import { explainPosition, askCoach } from "./coach.js";
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"];
@@ -11,6 +12,7 @@ const game = new Chess();
 let selected = null; // kotak yang sedang dipilih, mis. "e2"
 let legalTargets = []; // daftar objek move legal dari kotak terpilih
 let lastMove = null; // { from, to }
+let lastMoveSan = null; // notasi SAN langkah terakhir, untuk konteks AI
 let orientation = "white"; // "white" | "black"
 
 // Elemen DOM
@@ -23,6 +25,14 @@ const moveCountEl = document.getElementById("moveCount");
 const undoBtn = document.getElementById("undoBtn");
 const resetBtn = document.getElementById("resetBtn");
 const flipBtn = document.getElementById("flipBtn");
+
+// Elemen Pelatih AI
+const coachOutput = document.getElementById("coachOutput");
+const explainBtn = document.getElementById("explainBtn");
+const askForm = document.getElementById("askForm");
+const askInput = document.getElementById("askInput");
+const askBtn = document.getElementById("askBtn");
+const autoExplain = document.getElementById("autoExplain");
 
 /**
  * Bangun ulang seluruh papan dari posisi game saat ini.
@@ -141,11 +151,17 @@ function makeMove(move) {
   if (!result) return;
 
   lastMove = { from: result.from, to: result.to };
+  lastMoveSan = result.san;
   selected = null;
   legalTargets = [];
 
   renderBoard();
   updateInfo();
+
+  // Jelaskan otomatis bila mode Auto aktif
+  if (autoExplain && autoExplain.checked) {
+    runCoach(() => explainPosition(game, lastMoveSan));
+  }
 }
 
 function updateInfo() {
@@ -220,7 +236,14 @@ function undo() {
   const undone = game.undo();
   if (!undone) return;
   const hist = game.history({ verbose: true });
-  lastMove = hist.length ? { from: hist[hist.length - 1].from, to: hist[hist.length - 1].to } : null;
+  if (hist.length) {
+    const last = hist[hist.length - 1];
+    lastMove = { from: last.from, to: last.to };
+    lastMoveSan = last.san;
+  } else {
+    lastMove = null;
+    lastMoveSan = null;
+  }
   selected = null;
   legalTargets = [];
   renderBoard();
@@ -232,8 +255,10 @@ function reset() {
   selected = null;
   legalTargets = [];
   lastMove = null;
+  lastMoveSan = null;
   renderBoard();
   updateInfo();
+  setCoachPlaceholder();
 }
 
 function flip() {
@@ -244,6 +269,66 @@ function flip() {
 undoBtn.addEventListener("click", undo);
 resetBtn.addEventListener("click", reset);
 flipBtn.addEventListener("click", flip);
+
+/* ===== Pelatih AI ===== */
+
+function setCoachPlaceholder() {
+  coachOutput.className = "coach-output";
+  coachOutput.innerHTML =
+    '<p class="coach-output__placeholder">Klik "Jelaskan posisi" untuk minta penjelasan, atau ajukan pertanyaan di bawah. Pelatih menjawab berdasarkan posisi papan saat ini.</p>';
+}
+
+function setCoachLoading() {
+  coachOutput.className = "coach-output coach-output--loading";
+  coachOutput.innerHTML = '<span class="coach-typing">Pelatih sedang berpikir</span>';
+}
+
+function setCoachAnswer(text) {
+  coachOutput.className = "coach-output";
+  coachOutput.textContent = text;
+}
+
+function setCoachError(message) {
+  coachOutput.className = "coach-output coach-output--error";
+  coachOutput.textContent = "Gagal: " + message;
+}
+
+let coachBusy = false;
+
+/**
+ * Pembungkus pemanggilan AI: kelola status loading, error, dan tombol.
+ * `task` adalah fungsi yang mengembalikan Promise<string>.
+ */
+async function runCoach(task) {
+  if (coachBusy) return;
+  coachBusy = true;
+  explainBtn.disabled = true;
+  askBtn.disabled = true;
+  setCoachLoading();
+
+  try {
+    const answer = await task();
+    setCoachAnswer(answer);
+  } catch (err) {
+    setCoachError(err.message || "Terjadi kesalahan tak terduga.");
+  } finally {
+    coachBusy = false;
+    explainBtn.disabled = false;
+    askBtn.disabled = false;
+  }
+}
+
+explainBtn.addEventListener("click", () => {
+  runCoach(() => explainPosition(game, lastMoveSan));
+});
+
+askForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const q = askInput.value.trim();
+  if (!q) return;
+  askInput.value = "";
+  runCoach(() => askCoach(game, q, lastMoveSan));
+});
 
 // Keyboard shortcut: U = undo, R = reset, F = flip
 document.addEventListener("keydown", (e) => {

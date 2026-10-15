@@ -374,3 +374,102 @@ body {
   background: var(--border);
   border-radius: 8px;
 }
+
+/* ===== Pelatih AI ===== */
+.coach-card {
+  background: linear-gradient(145deg, rgba(110, 168, 254, 0.12), var(--panel));
+  border-color: rgba(110, 168, 254, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  user-select: none;
+}
+.switch input {
+  accent-color: var(--accent-strong);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.coach-output {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 72px;
+  max-height: 260px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.coach-output__placeholder {
+  color: var(--text-dim);
+  font-size: 13.5px;
+}
+.coach-output--loading {
+  color: var(--text-dim);
+  font-style: italic;
+}
+.coach-output--error {
+  color: #ff9b9b;
+  border-color: rgba(231, 76, 60, 0.5);
+}
+
+/* Titik "mengetik" saat menunggu AI */
+.coach-typing::after {
+  content: "";
+  animation: coachDots 1.2s steps(4, end) infinite;
+}
+@keyframes coachDots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+
+.coach-explain {
+  width: 100%;
+}
+
+.coach-ask {
+  display: flex;
+  gap: 8px;
+}
+.coach-ask__input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.coach-ask__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.coach-ask__input::placeholder {
+  color: var(--text-dim);
+}
+
+.coach-output::-webkit-scrollbar {
+  width: 8px;
+}
+.coach-output::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}

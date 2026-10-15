@@ -58,12 +58,36 @@
             <button id="resetBtn" class="btn btn--primary">&#8635; Mulai Ulang</button>
           </div>
 
-          <div class="panel__card hint-card">
-            <h2 class="panel__title">Tips</h2>
-            <p class="hint-text">
-              Klik bidak untuk melihat langkah yang legal (ditandai titik), lalu klik
-              kotak tujuan. Fitur penjelasan langkah dengan AI akan ditambahkan nanti.
-            </p>
+          <div class="panel__card coach-card">
+            <div class="panel__row">
+              <h2 class="panel__title">Pelatih AI</h2>
+              <label class="switch" title="Jelaskan otomatis tiap langkah">
+                <input type="checkbox" id="autoExplain" />
+                <span class="switch__label">Auto</span>
+              </label>
+            </div>
+
+            <div id="coachOutput" class="coach-output">
+              <p class="coach-output__placeholder">
+                Klik "Jelaskan posisi" untuk minta penjelasan, atau ajukan pertanyaan
+                di bawah. Pelatih menjawab berdasarkan posisi papan saat ini.
+              </p>
+            </div>
+
+            <button id="explainBtn" class="btn btn--primary coach-explain">
+              &#9788; Jelaskan posisi
+            </button>
+
+            <form id="askForm" class="coach-ask">
+              <input
+                id="askInput"
+                class="coach-ask__input"
+                type="text"
+                placeholder="Tanya pelatih, mis. 'langkah apa yang bagus?'"
+                autocomplete="off"
+              />
+              <button id="askBtn" class="btn btn--secondary" type="submit">Kirim</button>
+            </form>
           </div>
         </aside>
       </main>
