@@ -15,16 +15,19 @@
 // Utamakan model Flash yang cepat & stabil. Model generasi 3.x bersifat
 // "thinking" dan bisa makan waktu lama -> rawan timeout di Vercel Hobby (~10s).
 // Bisa dioverride lewat env GEMINI_MODEL.
+// Catatan: key ini diperlakukan sebagai "new user", jadi sebagian model 2.5
+// diblokir (404) / tidak stabil. Dari hasil ListModels, model generasi 3.x
+// tersedia penuh. Jadi utamakan 3.x Flash. Bisa dioverride via env GEMINI_MODEL.
 const GEMINI_MODELS = [
   process.env.GEMINI_MODEL,
-  "gemini-2.5-flash",
+  "gemini-3.5-flash",
+  "gemini-3.6-flash",
   "gemini-flash-latest",
-  "gemini-2.5-flash-lite",
 ].filter(Boolean);
 
 // Batas waktu per-panggilan ke Gemini (ms). Dibuat pendek supaya kalau satu
 // model lambat, kita cepat gagal & bisa coba model berikutnya dalam budget.
-const GEMINI_TIMEOUT_MS = 8000;
+const GEMINI_TIMEOUT_MS = 12000;
 const GEMINI_BASE =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -89,7 +92,10 @@ async function callGemini(apiKey, model, prompt) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 500,
+          maxOutputTokens: 800,
+          // Model 3.x "berpikir" dulu dan bisa menghabiskan token/waktu.
+          // Matikan thinking agar jawaban langsung keluar & cepat.
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
       signal: controller.signal,
