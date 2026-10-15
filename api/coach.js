@@ -22,8 +22,9 @@ const GEMINI_MODELS = [
   "gemini-2.5-flash-lite",
 ].filter(Boolean);
 
-// Batas waktu panggilan ke Gemini (ms). Disisakan di bawah batas Vercel.
-const GEMINI_TIMEOUT_MS = 25000;
+// Batas waktu per-panggilan ke Gemini (ms). Dibuat pendek supaya kalau satu
+// model lambat, kita cepat gagal & bisa coba model berikutnya dalam budget.
+const GEMINI_TIMEOUT_MS = 8000;
 const GEMINI_BASE =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -74,6 +75,7 @@ function buildPrompt({ mode, fen, pgn, lastMove, turn, legalMoves, question }) {
 async function callGemini(apiKey, model, prompt) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  const started = Date.now();
 
   let res;
   try {
@@ -88,17 +90,16 @@ async function callGemini(apiKey, model, prompt) {
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 500,
-          // Batasi "berpikir" model generasi baru agar tidak timeout.
-          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
       signal: controller.signal,
     });
   } catch (e) {
+    const secs = ((Date.now() - started) / 1000).toFixed(1);
     const err = new Error(
       e.name === "AbortError"
-        ? "Gemini terlalu lama merespons (timeout)."
-        : "Gagal menghubungi Gemini: " + e.message
+        ? `Timeout: '${model}' tidak merespons dalam ${secs}s.`
+        : `Gagal menghubungi '${model}' setelah ${secs}s: ${e.message}`
     );
     err.status = 504;
     throw err;
@@ -108,7 +109,7 @@ async function callGemini(apiKey, model, prompt) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    const err = new Error(`Gemini ${res.status}`);
+    const err = new Error(`Gemini ${res.status} (${model})`);
     err.status = res.status;
     err.detail = detail;
     throw err;
@@ -121,7 +122,15 @@ async function callGemini(apiKey, model, prompt) {
     .join("")
     .trim();
 
-  if (!text) throw new Error("Respons Gemini kosong.");
+  // Bila kosong, laporkan finishReason supaya ketahuan sebabnya
+  // (mis. MAX_TOKENS karena habis untuk "thinking", atau SAFETY).
+  if (!text) {
+    const reason = data?.candidates?.[0]?.finishReason || "UNKNOWN";
+    const err = new Error(`Respons kosong dari '${model}' (finishReason: ${reason}).`);
+    err.status = 502;
+    err.detail = JSON.stringify(data).slice(0, 600);
+    throw err;
+  }
   return text;
 }
 
