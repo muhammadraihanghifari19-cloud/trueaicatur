@@ -40,7 +40,15 @@ async function postCoach(payload) {
   }
 
   if (!res.ok) {
-    throw new Error(data.error || `Server membalas status ${res.status}.`);
+    // Tampilkan detail dari server (penyebab asli dari Gemini) bila ada,
+    // supaya mudah didiagnosis langsung dari UI tanpa buka log Vercel.
+    let msg = data.error || `Server membalas status ${res.status}.`;
+    if (data.detail) {
+      const detail =
+        typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+      msg += "\n\nDetail: " + detail;
+    }
+    throw new Error(msg);
   }
   return data.answer;
 }
