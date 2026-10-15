@@ -234,23 +234,37 @@ async function handle(req, res) {
 
   const prompt = buildPrompt({ mode, fen, pgn, lastMove, turn, legalMoves, question });
 
-  // Coba model utama, fallback ke model berikutnya kalau tidak tersedia.
+  // Status yang layak dicoba ulang (sisi Google, biasanya sementara):
+  // 503 UNAVAILABLE (sibuk), 429 rate limit, 500 internal.
+  const RETRYABLE = new Set([429, 500, 503]);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
   let lastErr = null;
+  // Coba tiap model satu kali. Bila error-nya sementara (sibuk/rate limit),
+  // beri satu jeda singkat lalu ulang sekali untuk model itu. Dibatasi agar
+  // total tetap di bawah maxDuration function.
   for (const model of GEMINI_MODELS) {
-    try {
-      const answer = await callGemini(apiKey, model, prompt);
-      return res.status(200).json({ answer, model });
-    } catch (err) {
-      lastErr = err;
-      // 404 = model tidak ada untuk key ini -> coba model berikutnya.
-      // Selain itu, hentikan dan laporkan.
-      if (err.status && err.status !== 404) break;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const answer = await callGemini(apiKey, model, prompt);
+        return res.status(200).json({ answer, model });
+      } catch (err) {
+        lastErr = err;
+        if (RETRYABLE.has(err.status) && attempt === 0) {
+          await sleep(700); // jeda singkat sebelum ulang sekali
+          continue;
+        }
+        break; // pindah ke model berikutnya
+      }
     }
   }
 
+  const busy = lastErr?.status === 503 || lastErr?.status === 429;
   const status = lastErr?.status || 502;
   return res.status(status).json({
-    error: "Gagal memanggil Gemini.",
+    error: busy
+      ? "Server Gemini sedang sibuk. Coba lagi beberapa saat."
+      : "Gagal memanggil Gemini.",
     detail: lastErr?.detail || lastErr?.message || "Unknown error",
     triedModels: GEMINI_MODELS,
     hint: "Buka /api/coach?list=1 untuk melihat model yang tersedia untuk key ini.",
