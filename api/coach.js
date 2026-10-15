@@ -9,7 +9,16 @@
 // Endpoint ini menerima posisi papan (FEN) + konteks dan mengembalikan
 // penjelasan dalam bahasa Indonesia dari Gemini.
 
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+// Daftar model dicoba berurutan (fallback bila yang di atas tidak tersedia
+// untuk key ini). Diurutkan dari yang terbaru ke yang lebih lama supaya tahan
+// terhadap deprecation. Bisa dioverride lewat env GEMINI_MODEL.
+const GEMINI_MODELS = [
+  process.env.GEMINI_MODEL,
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-2.5-flash",
+  "gemini-flash-latest",
+].filter(Boolean);
 const GEMINI_BASE =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -92,18 +101,59 @@ async function callGemini(apiKey, model, prompt) {
   return text;
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Gunakan metode POST." });
+/**
+ * Tanya ke Gemini: model apa saja yang tersedia untuk key ini & mendukung
+ * generateContent. Dipakai untuk diagnosa (GET /api/coach?list=1).
+ */
+async function listModels(apiKey) {
+  const res = await fetch(`${GEMINI_BASE}?pageSize=100`, {
+    headers: { "X-goog-api-key": apiKey },
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    const err = new Error(`ListModels ${res.status}`);
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
   }
+  const data = await res.json();
+  return (data.models || [])
+    .filter((m) =>
+      (m.supportedGenerationMethods || []).includes("generateContent")
+    )
+    .map((m) => m.name.replace(/^models\//, ""));
+}
 
+export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
       error:
         "GEMINI_API_KEY belum di-set. Tambahkan di Environment Variables (Vercel) atau file .env lokal.",
     });
+  }
+
+  // Endpoint diagnosa: GET /api/coach?list=1 -> daftar model yang tersedia.
+  if (req.method === "GET") {
+    if (req.query && (req.query.list === "1" || req.query.list === "true")) {
+      try {
+        const models = await listModels(apiKey);
+        return res.status(200).json({ availableModels: models, tried: GEMINI_MODELS });
+      } catch (err) {
+        return res.status(err.status || 502).json({
+          error: "Gagal mengambil daftar model.",
+          detail: err.detail || err.message,
+        });
+      }
+    }
+    return res
+      .status(200)
+      .json({ ok: true, hint: "Tambahkan ?list=1 untuk melihat model tersedia." });
+  }
+
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Gunakan metode POST." });
   }
 
   // Body bisa sudah objek (Vercel) atau string (dev server tertentu)
@@ -146,5 +196,7 @@ export default async function handler(req, res) {
   return res.status(status).json({
     error: "Gagal memanggil Gemini.",
     detail: lastErr?.detail || lastErr?.message || "Unknown error",
+    triedModels: GEMINI_MODELS,
+    hint: "Buka /api/coach?list=1 untuk melihat model yang tersedia untuk key ini.",
   });
 }
