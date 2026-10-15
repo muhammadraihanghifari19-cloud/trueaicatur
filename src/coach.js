@@ -20,16 +20,26 @@ export function snapshotPosition(game, lastMoveSan = null) {
 
 async function postCoach(payload) {
   let res;
+  // Batas waktu di sisi UI supaya panel tidak "berpikir" selamanya bila
+  // server/jaringan menggantung.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
   try {
     res = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
-  } catch {
+  } catch (e) {
+    if (e.name === "AbortError") {
+      throw new Error("Permintaan terlalu lama (timeout). Coba lagi.");
+    }
     throw new Error(
       "Tidak bisa menghubungi server AI. Pastikan menjalankan lewat `vercel dev` (bukan `npm run dev` biasa) agar /api aktif."
     );
+  } finally {
+    clearTimeout(timer);
   }
 
   let data = {};

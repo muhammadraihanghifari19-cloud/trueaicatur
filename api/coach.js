@@ -12,13 +12,18 @@
 // Daftar model dicoba berurutan (fallback bila yang di atas tidak tersedia
 // untuk key ini). Diurutkan dari yang terbaru ke yang lebih lama supaya tahan
 // terhadap deprecation. Bisa dioverride lewat env GEMINI_MODEL.
+// Utamakan model Flash yang cepat & stabil. Model generasi 3.x bersifat
+// "thinking" dan bisa makan waktu lama -> rawan timeout di Vercel Hobby (~10s).
+// Bisa dioverride lewat env GEMINI_MODEL.
 const GEMINI_MODELS = [
   process.env.GEMINI_MODEL,
-  "gemini-3.8-flash",
-  "gemini-3.6-flash",
   "gemini-2.5-flash",
   "gemini-flash-latest",
+  "gemini-2.5-flash-lite",
 ].filter(Boolean);
+
+// Batas waktu panggilan ke Gemini (ms). Disisakan di bawah batas Vercel.
+const GEMINI_TIMEOUT_MS = 25000;
 const GEMINI_BASE =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -67,20 +72,39 @@ function buildPrompt({ mode, fen, pgn, lastMove, turn, legalMoves, question }) {
 }
 
 async function callGemini(apiKey, model, prompt) {
-  const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 500,
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+
+  let res;
+  try {
+    res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-goog-api-key": apiKey,
       },
-    }),
-  });
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 500,
+          // Batasi "berpikir" model generasi baru agar tidak timeout.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const err = new Error(
+      e.name === "AbortError"
+        ? "Gemini terlalu lama merespons (timeout)."
+        : "Gagal menghubungi Gemini: " + e.message
+    );
+    err.status = 504;
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
