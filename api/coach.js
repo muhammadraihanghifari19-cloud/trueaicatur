@@ -158,6 +158,19 @@ async function listModels(apiKey) {
 }
 
 export default async function handler(req, res) {
+  // Bungkus semua agar error tak terduga tetap kembali sebagai JSON (bukan 503
+  // buta), supaya mudah didiagnosa dari UI/jaringan.
+  try {
+    return await handle(req, res);
+  } catch (err) {
+    return res.status(500).json({
+      error: "Error tak terduga di server.",
+      detail: String(err && (err.stack || err.message || err)),
+    });
+  }
+}
+
+async function handle(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
@@ -189,9 +202,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Gunakan metode POST." });
   }
 
-  // Body bisa sudah objek (Vercel) atau string (dev server tertentu)
+  // Body bisa: objek (Vercel biasanya), string, atau belum ter-parse.
   let body = req.body;
-  if (typeof body === "string") {
+  if (body == null) {
+    // Baca stream mentah sebagai cadangan.
+    try {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const raw = Buffer.concat(chunks).toString("utf8");
+      body = raw ? JSON.parse(raw) : {};
+    } catch {
+      body = {};
+    }
+  } else if (typeof body === "string") {
     try {
       body = JSON.parse(body || "{}");
     } catch {
